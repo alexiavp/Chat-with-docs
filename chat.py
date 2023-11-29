@@ -12,14 +12,16 @@ from templates.prompt import qa_template
 
 # Function to load a file given the name
 def load_doc(name):
+    # Load file using PyPDFLoader
     loader = PyPDFLoader(name, extract_images=True)
     pages = loader.load()
+    # Split the documents into small chunks
     text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
     docs = text_splitter.split_documents(pages)
     return docs
 
 
-# Funciton to get answer using openai chatbot without context
+# Function to get answer using openai chatbot without context
 def get_answer(history, query):
     openai.api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -47,9 +49,15 @@ def main():
 
     embeddings = OpenAIEmbeddings()
 
-    # Upload the documents in the vector database
-    db = DeepLake.from_documents(docs, dataset_path="./my_deeplake/",
-                                 embedding=embeddings, overwrite=True)
+    # Upload the documents in the vector database using the variables in the enviroment
+    username = os.environ.get("ACTIVELOOP_USERNAME")
+    token = os.environ.get("ACTIVELOOP_TOKEN")
+    dataset_path = f"hub://{username}/PDFs"
+
+    db = DeepLake.from_documents(docs, dataset_path=dataset_path,
+                                 token=token, embedding=embeddings,
+                                 overwrite=True,
+                                 )
 
     # To get answers from the paper loaded in the vector database
     qa = RetrievalQA.from_llm(
