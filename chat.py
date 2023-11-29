@@ -10,6 +10,7 @@ from langchain.chat_models import ChatOpenAI
 from templates.prompt import qa_template
 
 
+# Function to load a file given the name
 def load_doc(name):
     loader = PyPDFLoader(name, extract_images=True)
     pages = loader.load()
@@ -18,6 +19,7 @@ def load_doc(name):
     return docs
 
 
+# Funciton to get answer using openai chatbot without context
 def get_answer(history, query):
     openai.api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -36,6 +38,7 @@ def get_answer(history, query):
 
 
 def main():
+    # Load enviroment
     load_dotenv()
 
     history = ""
@@ -44,14 +47,17 @@ def main():
 
     embeddings = OpenAIEmbeddings()
 
+    # Upload the documents in the vector database
     db = DeepLake.from_documents(docs, dataset_path="./my_deeplake/",
                                  embedding=embeddings, overwrite=True)
 
+    # To get answers from the paper loaded in the vector database
     qa = RetrievalQA.from_llm(
         ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.5),
         retriever=db.as_retriever()
     )
 
+    # Endless bucle to execute the chat with the bot
     while True:
         query = input("> ")
         if query == "exit":
