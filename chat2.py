@@ -9,10 +9,16 @@ from langchain.document_loaders.csv_loader import CSVLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from templates.prompt import qa_template
+import streamlit as st
+
+# Load enviroment and initialize chat history
+load_dotenv()
+history = []
+loaded = False
 
 
 # Function that loads the files in the directory given,
-# and returns dataset. The files are loaded depending on 
+# and returns dataset. The files are loaded depending on
 # the type of file.
 def load_doc(name_dir, dataset_path, embeddings, token):
 
@@ -49,7 +55,8 @@ def load_doc(name_dir, dataset_path, embeddings, token):
     text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
     result = text_splitter.split_documents(docs)
     db = DeepLake.from_documents(result, dataset_path=dataset_path,
-                                 token=token, embedding=embeddings, overwrite=True
+                                 token=token, embedding=embeddings,
+                                 overwrite=True
                                  )
     return db
 
@@ -72,25 +79,22 @@ def get_answer(history, query):
     return chatbot_response
 
 
-def main():
-    # Load enviroment and initialize the chat history
-    load_dotenv()
-    history = []
+# Define title, caption and initialize the chat of the API
+st.title("💬 Chat")
+st.caption("🚀 A chat to interact with your documents!")
 
-    # Define title, caption and initialize the chat of the API
-    st.title("💬 Chat")
-    st.caption("🚀 A chat to interact with your documents!")
-
+if not loaded:
     # Create the varibles with the info loaded in the file .env
     username = os.environ.get("ACTIVELOOP_USERNAME")
     token = os.environ.get("ACTIVELOOP_TOKEN")
-    dataset_path = f"hub://{username}/PDF3"
+    dataset_path = f"hub://{username}/PDF5"
 
     # Create the embeddings used in the vector store
     embeddings = OpenAIEmbeddings()
 
     # Treat the documents in docs and load them in the new dataset that creates
-    load_doc("docs", dataset_path, embeddings, token)
+    # with st.spinner('Loading files in Vector Store ...'):
+    #    load_doc("docs", dataset_path, embeddings, token)
 
     # Load a dataset that already exists
     db = DeepLake(dataset_path=dataset_path, token=token,
@@ -101,16 +105,28 @@ def main():
     qa = ConversationalRetrievalChain.from_llm(
         ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2),
         retriever=db.as_retriever(qa_template=qa_template)
-    )
+        )
+    loaded = True
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
     # Endless bucle to execute the chat with the bot
-    while True:
-        query = input("> ")
-        if query.lower() == "exit":
-            break
+    # while True:
+    #    query = input("> ")
+if query := st.chat_input("Write your question and press Enter..."):
+    if query.lower() == "exit":
+        exit
+    st.session_state.messages.append({"role": "user", "content": query})
+    st.chat_message("user").markdown(query)
+    with st.spinner('Answering your question...'):
         response = qa({"question": query, "chat_history": history})
-        print(f'{response["answer"]}')
-        history.append((query, response["answer"]))
-
-
-main()
+    print(f'{response["answer"]}')
+    st.session_state.messages.append({"role": "assistant",
+                                      "content": response["answer"]})
+    st.chat_message("assistant").markdown(response["answer"])
+    history.append((query, response["answer"]))
