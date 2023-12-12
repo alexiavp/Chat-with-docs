@@ -8,7 +8,7 @@ prioritize the needs and satisfaction of the user.
 Your ultimate goal is to provide a helpful and enjoyable experience
 for the user.
 
-{conversation_history}
+{history}
 
 Question: {question}
 
