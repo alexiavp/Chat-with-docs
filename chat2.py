@@ -14,7 +14,6 @@ import streamlit as st
 # Load enviroment and initialize chat history
 load_dotenv()
 history = []
-loaded = False
 
 
 # Function that loads the files in the directory given,
@@ -79,54 +78,70 @@ def get_answer(history, query):
     return chatbot_response
 
 
-# Define title, caption and initialize the chat of the API
-st.title("💬 Chat")
-st.caption("🚀 A chat to interact with your documents!")
+def main():
 
-if not loaded:
-    # Create the varibles with the info loaded in the file .env
-    username = os.environ.get("ACTIVELOOP_USERNAME")
-    token = os.environ.get("ACTIVELOOP_TOKEN")
-    dataset_path = f"hub://{username}/PDF5"
+    gb_msg = "Thank you for using our service! Have a great day!"
 
-    # Create the embeddings used in the vector store
-    embeddings = OpenAIEmbeddings()
+    # Define title, caption and initialize the chat of the API
+    st.title("💬 Chat")
+    st.caption("🚀 A chat to interact with your documents!")
 
-    # Treat the documents in docs and load them in the new dataset that creates
-    # with st.spinner('Loading files in Vector Store ...'):
-    #    load_doc("docs", dataset_path, embeddings, token)
+    if "loaded" not in st.session_state:
+        # Create the varibles with the info loaded in the file .env
+        username = os.environ.get("ACTIVELOOP_USERNAME")
+        token = os.environ.get("ACTIVELOOP_TOKEN")
+        dataset_path = f"hub://{username}/docs"
 
-    # Load a dataset that already exists
-    db = DeepLake(dataset_path=dataset_path, token=token,
-                  embedding=embeddings, read_only=True
-                  )
+        # Create the embeddings used in the vector store
+        embeddings = OpenAIEmbeddings()
 
-    # To get answers from the paper loaded in the vector database
-    qa = ConversationalRetrievalChain.from_llm(
-        ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2),
-        retriever=db.as_retriever(qa_template=qa_template)
-        )
-    loaded = True
+        # Treat the documents in the directory docs and load them
+        # in the new dataset that it's created in the function.
+        with st.spinner("Indexing documents... this might take a while⏳"):
+            load_doc("docs", dataset_path, embeddings, token)
+            # Load a dataset that already exists
+            db = DeepLake(dataset_path=dataset_path, token=token,
+                          embedding=embeddings, read_only=True
+                          )
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+        # To get answers from the paper loaded in the vector database
+        qa = ConversationalRetrievalChain.from_llm(
+            ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2),
+            retriever=db.as_retriever(qa_template=qa_template)
+            )
+        st.session_state.loaded = True
+        st.session_state.qa = qa
+    else:
+        qa = st.session_state.qa
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    # Endless bucle to execute the chat with the bot
-    # while True:
-    #    query = input("> ")
-if query := st.chat_input("Write your question and press Enter..."):
-    if query.lower() == "exit":
-        exit
-    st.session_state.messages.append({"role": "user", "content": query})
-    st.chat_message("user").markdown(query)
-    with st.spinner('Answering your question...'):
-        response = qa({"question": query, "chat_history": history})
-    print(f'{response["answer"]}')
-    st.session_state.messages.append({"role": "assistant",
-                                      "content": response["answer"]})
-    st.chat_message("assistant").markdown(response["answer"])
-    history.append((query, response["answer"]))
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if query := st.chat_input("Write your question and press Enter..."):
+        if query.lower() == "exit":
+            st.session_state.messages.append({"role": "user",
+                                              "content": query})
+            st.chat_message("user").markdown(query)
+            st.session_state.messages.append({"role": "assistant",
+                                              "content": gb_msg})
+            st.chat_message("assistant").markdown(gb_msg)
+            for key in st.session_state.keys():
+                del st.session_state[key]
+            st.stop()
+            exit()
+        st.session_state.messages.append({"role": "user", "content": query})
+        st.chat_message("user").markdown(query)
+        with st.spinner('Answering your question...'):
+            response = qa({"question": query, "chat_history": history})
+        print(f'{response["answer"]}')
+        st.session_state.messages.append({"role": "assistant",
+                                          "content": response["answer"]})
+        st.chat_message("assistant").markdown(response["answer"])
+        history.append((query, response["answer"]))
+
+
+main()
