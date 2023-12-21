@@ -73,9 +73,9 @@ def get_answer(history, query):
         stop=None, temperature=0.5
     )
     response_text = response["choices"][0]["text"]
-    chatbot_response = response_text.strip()
+    chat_response = response_text.strip()
 
-    return chatbot_response
+    return chat_response
 
 
 def main():
@@ -90,7 +90,7 @@ def main():
         # Create the varibles with the info loaded in the file .env
         username = os.environ.get("ACTIVELOOP_USERNAME")
         token = os.environ.get("ACTIVELOOP_TOKEN")
-        dataset_path = f"hub://{username}/docs"
+        dataset_path = f"hub://{username}/docs4"
 
         # Create the embeddings used in the vector store
         embeddings = OpenAIEmbeddings()
@@ -106,7 +106,8 @@ def main():
 
         # To get answers from the paper loaded in the vector database
         qa = ConversationalRetrievalChain.from_llm(
-            ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2),
+            ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0.2,
+                       streaming=True),
             retriever=db.as_retriever(qa_template=qa_template)
             )
         st.session_state.loaded = True
@@ -137,7 +138,6 @@ def main():
         st.chat_message("user").markdown(query)
         with st.spinner('Answering your question...'):
             response = qa({"question": query, "chat_history": history})
-        print(f'{response["answer"]}')
         st.session_state.messages.append({"role": "assistant",
                                           "content": response["answer"]})
         st.chat_message("assistant").markdown(response["answer"])
