@@ -15,6 +15,7 @@ from langchain.document_loaders import PyPDFLoader, TextLoader
 from langchain.document_loaders import UnstructuredExcelLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders.csv_loader import CSVLoader
+from langchain.document_loaders import UnstructuredPowerPointLoader
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
@@ -120,9 +121,14 @@ def load_doc(name_dir, dataset_path, embeddings, token, files):
                     # Load file using Doc2txtLoader
                     loader = Docx2txtLoader(file_path)
                     docs.extend(loader.load())
+                case ".pptx":
+                    # Load file using UnstructuredPowerPointLoader
+                    loader = UnstructuredPowerPointLoader(file_path,
+                                                          mode="elements")
+                    docs.extend(loader.load())
 
     # Split the documents into chunks
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    text_splitter = CharacterTextSplitter(chunk_size=1500, chunk_overlap=0)
     result = text_splitter.split_documents(docs)
     db = DeepLake(dataset_path=dataset_path, embedding=embeddings, token=token)
     db.add_documents(result)
@@ -266,7 +272,7 @@ def main():
         # An if to only create the dataset and load the files once
         if "loaded" not in st.session_state:
             # Define the dataset_path where the files are loaded
-            dataset_path = f"hub://{DeepLake.username}/docs2"
+            dataset_path = f"hub://{DeepLake.username}/DOCS"
             st.session_state.path = dataset_path
 
             # Create the embeddings used in the vector store
