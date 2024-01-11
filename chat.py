@@ -8,10 +8,12 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from googleapiclient.errors import HttpError
+from openai.error import AuthenticationError
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import DeepLake
-from langchain.document_loaders import PyPDFLoader, TextLoader
+from langchain.document_loaders import TextLoader
+from langchain.document_loaders import PyMuPDFLoader
 from langchain.document_loaders import UnstructuredExcelLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders.csv_loader import CSVLoader
@@ -60,7 +62,7 @@ def download_files():
                 while done is False:
                     done = downloader.next_chunk()
             except HttpError as error:
-                print(F'An error occurred: {error}')
+                st.error(F'An error occurred: {error}', icon="🚨")
 
             file_retrieved: str = file.getvalue()
             with open(f"docs/{row['name']}", 'wb') as f:
@@ -95,7 +97,7 @@ def load_doc(name_dir, dataset_path, embeddings, token, files):
             match (os.path.splitext(file)[1]):
                 case ".pdf":
                     # Load file using PyPDFLoader
-                    loader = PyPDFLoader(file_path, extract_images=True)
+                    loader = PyMuPDFLoader(file_path, extract_images=True)
                     docs.extend(loader.load())
                 case ".txt":
                     # Load file using TextLoader
@@ -128,7 +130,7 @@ def load_doc(name_dir, dataset_path, embeddings, token, files):
                     docs.extend(loader.load())
 
     # Split the documents into chunks
-    text_splitter = CharacterTextSplitter(chunk_size=1500, chunk_overlap=0)
+    text_splitter = CharacterTextSplitter(chunk_size=2048, chunk_overlap=24)
     result = text_splitter.split_documents(docs)
     db = DeepLake(dataset_path=dataset_path, embedding=embeddings, token=token)
     db.add_documents(result)
@@ -162,7 +164,7 @@ def check_new_files(files):
                     while done is False:
                         done = downloader.next_chunk()
                 except HttpError as error:
-                    print(F'An error occurred: {error}')
+                    st.error(F'An error occurred: {error}', icon="🚨")
 
                 file_retrieved: str = file.getvalue()
                 with open(f"docs/{row['name']}", 'wb') as f:
@@ -226,8 +228,9 @@ def main():
         DeepLake.token = st.text_input("Activeloop Token",
                                        key="activeloop_token",
                                        type="password")
+        st.write("Make sure they are correct 👀")
 
-        add_vertical_space(5)
+        add_vertical_space(4)
 
         # Definition of the button to look for new files in the folder,
         # downloading and creates again the qa variable
@@ -272,7 +275,7 @@ def main():
         # An if to only create the dataset and load the files once
         if "loaded" not in st.session_state:
             # Define the dataset_path where the files are loaded
-            dataset_path = f"hub://{DeepLake.username}/DOCS"
+            dataset_path = f"hub://{DeepLake.username}/PDF"
             st.session_state.path = dataset_path
 
             # Create the embeddings used in the vector store
@@ -283,9 +286,11 @@ def main():
             # the date and hour
             with st.spinner("Indexing documents... this might take a while⏳"):
                 files = download_files()
-                create_empty_dataset(dataset_path, DeepLake.token)
-                db = load_doc("docs", dataset_path, embeddings, DeepLake.token,
-                              files)
+                # create_empty_dataset(dataset_path, DeepLake.token)
+                # db=load_doc("docs", dataset_path, embeddings, DeepLake.token,
+                #              files)
+                db = DeepLake(dataset_path=dataset_path, embedding=embeddings,
+                              token=DeepLake.token, read_only=True)
                 date = datetime.now()
                 date_formated = date.strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state.hour_check = date_formated
@@ -343,13 +348,21 @@ def main():
 
             # While the we're searching for the answer it shows a spinner
             with st.spinner('Answering your question...'):
-                response = qa({"question": query, "chat_history": history})
-
-            # Adds the answer to the chat
-            st.session_state.messages.append({"role": "assistant",
-                                              "content": response["answer"]})
-            st.chat_message("assistant").markdown(response["answer"])
-            history.append((query, response["answer"]))
+                try:
+                    response = qa({"question": query, "chat_history": history})
+                    # Adds the answer to the chat
+                    st.session_state.messages.append({"role": "assistant",
+                                                      "content":
+                                                      response["answer"]})
+                    st.chat_message("assistant").markdown(response["answer"])
+                    history.append((query, response["answer"]))
+                except AuthenticationError as error:
+                    st.error(F'An error occurred: {error}', icon="🚨")
+                    response = "OpenAI key incorrect!"
+                    st.session_state.messages.append({"role": "system",
+                                                      "content":
+                                                      response})
+                    st.chat_message("system").markdown(response)
 
 
 main()
