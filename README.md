@@ -1,7 +1,6 @@
-```markdown
 # Chat with Docs
 
-This project enables users to interact with their documents using a chat interface. 
+This repository contains my final degree project, it enables users to interact with their documents using a chat interface. 
 It leverages OpenAI's language model and Google Drive integration to provide a conversational experience.
 
 ## Files
@@ -63,5 +62,3 @@ Create your own service account in Google Cloud, you can follow the instructions
 
 - [OpenAI](https://www.openai.com/) for providing the powerful language model.
 - [Activeloop](https://www.activeloop.ai/) for the data versioning and collaboration tools.
-
-```
